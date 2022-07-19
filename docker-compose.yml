@@ -1,0 +1,7 @@
+version: "3.3"
+services:
+  lila-gif:
+    build:
+      context: ../lichess-server/lila-gif
+    ports:
+      - 6175:6175
