@@ -38,5 +38,5 @@ jobs:
           docker tag $DOCKER_FILE:$DOCKER_FILE_VERSION $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$DOCKER_FILE:$DOCKER_TAG
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$DOCKER_FILE:$DOCKER_TAG
-      - name: Force lila stack redeploy
-        run: aws ecs update-service --cluster primer-lichess --service lila-stack --force-new-deployment | jq .
+      - name: Force lila stack staging redeploy
+        run: aws ecs update-service --cluster lila-stack-staging --service lila-stack-service-staging --force-new-deployment | jq .
