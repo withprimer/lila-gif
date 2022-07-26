@@ -1,6 +1,5 @@
 use gift::block::{ColorTableConfig, GlobalColorTable};
 use ndarray::{s, Array2, ArrayView2};
-use rusttype::Font;
 use shakmaty::{Piece, Role};
 
 const SQUARE: usize = 90;
@@ -36,7 +35,6 @@ pub struct Theme {
     color_table_config: ColorTableConfig,
     global_color_table: GlobalColorTable,
     sprite: Array2<u8>,
-    font: Font<'static>,
 }
 
 impl Theme {
@@ -52,19 +50,11 @@ impl Theme {
             Array2::from_shape_vec((SQUARE * 8, SQUARE * 8), frame.image_data.data().to_owned())
                 .expect("from shape");
 
-        let font_data = include_bytes!("../theme/NotoSans-Regular.ttf") as &[u8];
-        let font = Font::try_from_bytes(font_data).expect("parse font");
-
         Theme {
             color_table_config: preamble.logical_screen_desc.color_table_config(),
             global_color_table: preamble.global_color_table.expect("color table present"),
             sprite,
-            font,
         }
-    }
-
-    pub fn font(&self) -> &Font {
-        &self.font
     }
 
     pub fn color_table_config(&self) -> ColorTableConfig {
@@ -77,22 +67,6 @@ impl Theme {
 
     pub fn bar_color(&self) -> u8 {
         self.sprite[(0, SQUARE * 4)]
-    }
-
-    pub fn text_color(&self) -> u8 {
-        self.sprite[(0, SQUARE * 4 + COLOR_WIDTH)]
-    }
-
-    pub fn gold_color(&self) -> u8 {
-        self.sprite[(0, SQUARE * 4 + COLOR_WIDTH * 2)]
-    }
-
-    pub fn bot_color(&self) -> u8 {
-        self.sprite[(0, SQUARE * 4 + COLOR_WIDTH * 3)]
-    }
-
-    pub fn med_text_color(&self) -> u8 {
-        self.sprite[(0, SQUARE * 4 + COLOR_WIDTH * 4)]
     }
 
     pub fn transparent_color(&self) -> u8 {
@@ -111,12 +85,8 @@ impl Theme {
         60
     }
 
-    pub fn height(&self, bars: bool) -> usize {
-        if bars {
-            self.width() + 2 * self.bar_height()
-        } else {
-            self.width()
-        }
+    pub fn height(&self) -> usize {
+        self.width()
     }
 
     pub fn sprite(&self, key: SpriteKey) -> ArrayView2<u8> {
