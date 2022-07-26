@@ -3,7 +3,6 @@ use std::{iter::FusedIterator, vec};
 use bytes::{BufMut, Bytes, BytesMut};
 use gift::{block, Encoder};
 use ndarray::{s, ArrayViewMut2};
-use rusttype::{Font, Scale};
 use shakmaty::{uci::Uci, Bitboard, Board};
 
 use crate::{
@@ -17,18 +16,12 @@ enum RenderState {
     Complete,
 }
 
-struct PlayerBars {
-    white: PlayerName,
-    black: PlayerName,
-}
+struct PlayerBars {}
 
 impl PlayerBars {
     fn from(white: Option<PlayerName>, black: Option<PlayerName>) -> Option<PlayerBars> {
         if white.is_some() || black.is_some() {
-            Some(PlayerBars {
-                white: white.unwrap_or_default(),
-                black: black.unwrap_or_default(),
-            })
+            Some(PlayerBars {})
         } else {
             None
         }
@@ -59,7 +52,6 @@ impl RenderFrame {
 
 pub struct Render {
     theme: &'static Theme,
-    font: &'static Font<'static>,
     state: RenderState,
     buffer: Vec<u8>,
     comment: Option<Comment>,
@@ -71,12 +63,10 @@ pub struct Render {
 
 impl Render {
     pub fn new_image(themes: &'static Themes, params: RequestParams) -> Render {
-        let bars = params.white.is_some() || params.black.is_some();
         let theme = themes.get(params.theme, params.piece);
         Render {
             theme,
-            font: themes.font(),
-            buffer: vec![0; theme.height(bars) * theme.width()],
+            buffer: vec![0; theme.height() * theme.width()],
             state: RenderState::Preamble,
             comment: params.comment,
             bars: PlayerBars::from(params.white, params.black),
@@ -93,13 +83,11 @@ impl Render {
     }
 
     pub fn new_animation(themes: &'static Themes, params: RequestBody) -> Render {
-        let bars = params.white.is_some() || params.black.is_some();
         let default_delay = params.delay;
         let theme = themes.get(params.theme, params.piece);
         Render {
             theme,
-            font: themes.font(),
-            buffer: vec![0; theme.height(bars) * theme.width()],
+            buffer: vec![0; theme.height() * theme.width()],
             state: RenderState::Preamble,
             comment: params.comment,
             bars: PlayerBars::from(params.white, params.black),
@@ -134,7 +122,7 @@ impl Iterator for Render {
                 blocks
                     .encode(
                         block::LogicalScreenDesc::default()
-                            .with_screen_height(self.theme.height(self.bars.is_some()) as u16)
+                            .with_screen_height(self.theme.height() as u16)
                             .with_screen_width(self.theme.width() as u16)
                             .with_color_table_config(self.theme.color_table_config()),
                     )
@@ -160,34 +148,12 @@ impl Iterator for Render {
                     blocks.encode(comments).expect("enc comment");
                 }
 
-                let mut view = ArrayViewMut2::from_shape(
-                    (self.theme.height(self.bars.is_some()), self.theme.width()),
+                let view = ArrayViewMut2::from_shape(
+                    (self.theme.height(), self.theme.width()),
                     &mut self.buffer,
                 )
                 .expect("shape");
-
-                let mut board_view = if let Some(ref bars) = self.bars {
-                    render_bar(
-                        view.slice_mut(s!(..self.theme.bar_height(), ..)),
-                        self.theme,
-                        self.font,
-                        self.orientation.fold(&bars.black, &bars.white),
-                    );
-
-                    render_bar(
-                        view.slice_mut(s!((self.theme.bar_height() + self.theme.width()).., ..)),
-                        self.theme,
-                        self.font,
-                        self.orientation.fold(&bars.white, &bars.black),
-                    );
-
-                    view.slice_mut(s!(
-                        self.theme.bar_height()..(self.theme.bar_height() + self.theme.width()),
-                        ..
-                    ))
-                } else {
-                    view
-                };
+                let mut board_view = view;
 
                 let frame = self.frames.next().unwrap_or_default();
 
@@ -208,7 +174,7 @@ impl Iterator for Render {
                 blocks
                     .encode(
                         block::ImageDesc::default()
-                            .with_height(self.theme.height(self.bars.is_some()) as u16)
+                            .with_height(self.theme.height() as u16)
                             .with_width(self.theme.width() as u16),
                     )
                     .expect("enc image desc");
@@ -272,7 +238,7 @@ impl Iterator for Render {
                         ctrl.set_delay_time_cs(1);
                         blocks.encode(ctrl).expect("enc graphic control");
 
-                        let height = self.theme.height(self.bars.is_some());
+                        let height = self.theme.height();
                         let width = self.theme.width();
                         blocks
                             .encode(
@@ -368,63 +334,6 @@ fn render_diff(
         (theme.square() * x_min, theme.square() * y_min),
         (width, height),
     )
-}
-
-fn render_bar(mut view: ArrayViewMut2<u8>, theme: &Theme, font: &Font, player_name: &str) {
-    view.fill(theme.bar_color());
-
-    let mut text_color = theme.text_color();
-    if player_name.starts_with("BOT ") {
-        text_color = theme.bot_color();
-    } else {
-        for title in &[
-            "GM ", "WGM ", "IM ", "WIM ", "FM ", "WFM ", "NM ", "CM ", "WCM ", "WNM ", "LM ",
-            "BOT ",
-        ] {
-            if player_name.starts_with(title) {
-                text_color = theme.gold_color();
-                break;
-            }
-        }
-    }
-
-    let height = 40.0;
-    let padding = 10.0;
-    let scale = Scale {
-        x: height,
-        y: height,
-    };
-
-    let v_metrics = font.v_metrics(scale);
-    let glyphs = font.layout(
-        player_name,
-        scale,
-        rusttype::point(padding, padding + v_metrics.ascent),
-    );
-
-    for g in glyphs {
-        if let Some(bb) = g.pixel_bounding_box() {
-            // Poor man's anti-aliasing.
-            g.draw(|left, top, intensity| {
-                let left = left as i32 + bb.min.x;
-                let top = top as i32 + bb.min.y;
-                if 0 <= left
-                    && left < theme.width() as i32
-                    && 0 <= top
-                    && top < theme.bar_height() as i32
-                    && intensity >= 0.01
-                {
-                    if intensity < 0.5 && text_color == theme.text_color() {
-                        view[(top as usize, left as usize)] = theme.med_text_color();
-                    } else {
-                        view[(top as usize, left as usize)] = text_color;
-                    }
-                }
-            });
-        } else {
-            text_color = theme.text_color();
-        }
-    }
 }
 
 fn highlight_uci(uci: Option<Uci>) -> Bitboard {

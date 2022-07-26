@@ -1,6 +1,5 @@
 use gift::block::{ColorTableConfig, GlobalColorTable};
 use ndarray::{s, Array2, ArrayView2};
-use rusttype::Font;
 use shakmaty::{Piece, Role};
 
 use crate::assets::{sprite_data, BoardTheme, ByBoardTheme, ByPieceSet, PieceSet};
@@ -71,22 +70,6 @@ impl Theme {
         self.sprite[(0, SQUARE * 4)]
     }
 
-    pub fn text_color(&self) -> u8 {
-        self.sprite[(0, SQUARE * 4 + COLOR_WIDTH)]
-    }
-
-    pub fn gold_color(&self) -> u8 {
-        self.sprite[(0, SQUARE * 4 + COLOR_WIDTH * 2)]
-    }
-
-    pub fn bot_color(&self) -> u8 {
-        self.sprite[(0, SQUARE * 4 + COLOR_WIDTH * 3)]
-    }
-
-    pub fn med_text_color(&self) -> u8 {
-        self.sprite[(0, SQUARE * 4 + COLOR_WIDTH * 4)]
-    }
-
     pub fn transparent_color(&self) -> u8 {
         self.sprite[(0, SQUARE * 4 + COLOR_WIDTH * 5)]
     }
@@ -103,12 +86,8 @@ impl Theme {
         60
     }
 
-    pub fn height(&self, bars: bool) -> usize {
-        if bars {
-            self.width() + 2 * self.bar_height()
-        } else {
-            self.width()
-        }
+    pub fn height(&self) -> usize {
+        self.width()
     }
 
     pub fn sprite(&self, key: SpriteKey) -> ArrayView2<u8> {
@@ -123,24 +102,15 @@ impl Theme {
 
 pub struct Themes {
     map: ByBoardTheme<ByPieceSet<Theme>>,
-    font: Font<'static>,
 }
 
 impl Themes {
     pub fn new() -> Themes {
-        let font_data = include_bytes!("../theme/NotoSans-Regular.ttf") as &[u8];
-        let font = Font::try_from_bytes(font_data).expect("parse font");
-
         Themes {
             map: ByBoardTheme::new(|board| {
                 ByPieceSet::new(|pieces| Theme::new(sprite_data(board, pieces)))
             }),
-            font,
         }
-    }
-
-    pub fn font(&self) -> &Font {
-        &self.font
     }
 
     pub fn get(&self, board: BoardTheme, pieces: PieceSet) -> &Theme {
